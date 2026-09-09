@@ -93,6 +93,15 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 	FString curParam;
 	TCHAR* end;
 	char firstChar;
+	if (params.Num() != validDef->params.Num()) {
+		if (params.Num() < validDef->params.Num()) {
+			UE_LOG(LogVM, Error, TEXT("There were too few params for the %s command when verifing a %s! Expected: %s"), *base, *line, *validDef->toString());
+		}
+		else {
+			UE_LOG(LogVM, Error, TEXT("There were too many params for the %s command when verifing a %s! Expected: %s"), *base, *line, *validDef->toString());
+		}
+		return false;
+	}
 	for (const EparameterType& type : validDef->params) {
 		curParam = params[counter];
 		switch (type)
