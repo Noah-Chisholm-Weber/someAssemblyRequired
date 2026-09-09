@@ -121,7 +121,7 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 				UE_LOG(LogVM, Warning, TEXT("Could not parse an int for the register id after address type identifier for address only parameter! Line: %s"), *line);
 				return false;
 			}
-
+			break;
 		case EparameterType::value:
 			switch (counter) {
 			case 0:
@@ -141,6 +141,7 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 				UE_LOG(LogVM, Warning, TEXT("Could not parse an int for value only parameter! Line: %s"), *line);
 				return false;
 			}
+			break;
 		case EparameterType::label:
 			UE_LOG(LogVM, Error, TEXT("Label not implemlented yet!"));
 			return false;
@@ -184,6 +185,7 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 				UE_LOG(LogVM, Warning, TEXT("Could not parse an int for the register id after address type identifier for address or value parameter! Line: %s"), *line);
 				return false;
 			}
+			break;
 		default:
 			UE_LOG(LogVM, Error, TEXT("Unhandled EparameterType in verifyLine!"));
 			break;
