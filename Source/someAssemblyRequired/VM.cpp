@@ -175,8 +175,7 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 					UE_LOG(LogVM, Warning, TEXT("Could not parse an int for address or value parameter when missing address type identifier! Line: %s"), *line);
 					return false;
 				}
-			}
-			switch (counter) {
+			} else switch (counter) {
 			case 0:
 				compiledInstruction.op1 = FopperandValue(firstChar == 'R' ? EopperandType::reg : EopperandType::port, FCString::Strtoi(*curParam + 1, &end, 10));
 				break;
@@ -253,6 +252,11 @@ TArray<int32> UVM::getPort(uint8 port)
 	if (validPort) return *validPort;
 	else UE_LOG(LogVM, Error, TEXT("Could not find port %d"), port);
 	return TArray<int32>();
+}
+
+int32 UVM::getRegister(int32 reg)
+{
+	return readRegister(reg);
 }
 
 bool UVM::runProgram(FString program)

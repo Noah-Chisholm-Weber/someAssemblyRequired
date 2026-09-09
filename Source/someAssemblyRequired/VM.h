@@ -179,6 +179,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
 	TArray<int32> getPort(uint8 port);
 
+	UFUNCTION(BlueprintCallable, Category = "Program Debugging")
+	int32 getRegister(int32 reg);
+
 	UFUNCTION(BlueprintCallable, Category = "Program Execution")
 	bool runProgram(FString program);
 
