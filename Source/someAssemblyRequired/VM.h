@@ -18,6 +18,13 @@ enum class EparameterType
 	addrOrValue
 };
 
+UENUM()
+enum class EopCode
+{
+	add,
+	mov,
+};
+
 USTRUCT()
 struct FinstructionDefinition
 {
@@ -60,13 +67,6 @@ struct FinstructionDefinition
 		}
 		return toReturn;
 	}
-};
-
-UENUM()
-enum class EopCode
-{
-	add,
-	mov,
 };
 
 UENUM()
@@ -117,6 +117,48 @@ struct FcompiledInstruction
 	FopperandValue op3;
 };
 
+UENUM(BlueprintType)
+enum class EReadWriteEnable : uint8
+{
+	None = 0x0,
+	read = 0x1,
+	write = 0x2,
+	readWrite = 0x3
+};
+
+USTRUCT(BlueprintType)
+struct FPort
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+	TArray<int32> myData;
+
+	UPROPERTY(BlueprintReadWrite)
+	uint8 rwFlags;
+
+	bool operator==(const FPort& Other) const
+	{
+		return rwFlags == Other.rwFlags && myData == Other.myData;
+	}
+
+	FPort(TArray<int32> _myData, uint8 _rwFlags) : myData(_myData), rwFlags(_rwFlags) {
+
+	}
+
+	FPort() {
+		rwFlags = 0;
+	}
+};
+
+FORCEINLINE uint32 GetTypeHash(const FPort& port)
+{
+	// Combine hashes using Unreal's built-in HashCombine function
+	uint32 Hash = GetTypeHash(port.rwFlags);
+	Hash = HashCombine(Hash, GetTypeHash(port.myData));
+	return Hash;
+}
+
 USTRUCT(BlueprintType)
 struct FportDataLoader
 {
@@ -125,18 +167,49 @@ struct FportDataLoader
 	UPROPERTY(BlueprintReadWrite)
 	uint8 portNumber;
 
-	UPROPERTY(BlueprintReadWrite);
-	TArray<int32> data;
+	UPROPERTY(BlueprintReadWrite)
+	FPort data;
 
 	FportDataLoader() {
 		portNumber = 0;
-		data = TArray<int32>();
+		data = FPort();
 	}
 
-	FportDataLoader(uint8 _portNumber, TArray<int32> _data) : portNumber(_portNumber), data(_data) {
+	FportDataLoader(uint8 _portNumber, FPort _data) : portNumber(_portNumber), data(_data) {
 
+	}
+
+	FportDataLoader(uint8 _portNumber, TArray<int32> _data) : portNumber(_portNumber), data(_data, (uint8)EReadWriteEnable::readWrite) {
+
+	}
+
+	bool operator==(const FportDataLoader& Other) const
+	{
+		return portNumber == Other.portNumber && data == Other.data;
 	}
 };
+
+// 2. Declare the Custom Hash Function globally (Must match this exact signature)
+FORCEINLINE uint32 GetTypeHash(const FportDataLoader& dataLoader)
+{
+	// Combine hashes using Unreal's built-in HashCombine function
+	uint32 Hash = GetTypeHash(dataLoader.portNumber);
+	Hash = HashCombine(Hash, GetTypeHash(dataLoader.data));
+	return Hash;
+}
+USTRUCT(BlueprintType)
+struct FProgramResults
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+	TMap<uint8, FPort> ports;
+
+	UPROPERTY(BlueprintReadWrite)
+	bool ranWithoutErrors;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FProgramEnded, FProgramResults, results);
 
 UCLASS(BlueprintType)
 class SOMEASSEMBLYREQUIRED_API UVM : public UObject
@@ -153,9 +226,14 @@ private:
 	uint32 maxReg;
 	uint8 maxPort;
 	TArray<int32> registers;
-	TMap<uint8, TArray<int32>> ports;
+	TMap<uint8, FPort> ports;
 	bool interrupt = false;
 	uint32 pc = 0;
+	TArray<FcompiledInstruction> curProgram;
+	float runSpeed = 0.75f;
+	FTimerHandle stepTimer;
+	bool runningProgram = false;
+	bool ranWithoutErrors = true;
 
 	int readRegister(uint32 reg);
 	int readPort(uint8 port);
@@ -179,6 +257,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
 	TArray<int32> getPort(uint8 port);
 
+	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
+	FPort getPortFull(uint8 port);
+
 	UFUNCTION(BlueprintCallable, Category = "Program Debugging")
 	int32 getRegister(int32 reg);
 
@@ -190,4 +271,16 @@ public:
 
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Program Execution/Tests")
 	void testRunProgram();
+
+	UFUNCTION(BlueprintCallable, Category = "Program Execution")
+	void unPauseProgram();
+
+	UFUNCTION(BlueprintCallable, Category = "Program Execution")
+	bool stepProgram();
+
+	UFUNCTION(BlueprintCallable, Category = "Program Execution")
+	void pauseProgram();
+
+	UPROPERTY(BlueprintAssignable, Category = "Program Execution")
+	FProgramEnded programEnded;
 };

@@ -20,9 +20,14 @@ int UVM::readRegister(uint32 reg) {
 }
 
 int UVM::readPort(uint8 port) {
-	TArray<int>* validPort = ports.Find(port);
-	if (validPort) return validPort->Pop();
-	else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
+	FPort* validPort = ports.Find(port);
+	if (validPort) {
+		if (((uint8)validPort->rwFlags & (uint8)EReadWriteEnable::read) == 0) {
+			raiseInterrupt(FString::Printf(TEXT("Attempting to read from a write only port, port number: %d!"), port));
+			return -1;
+		}
+		return validPort->myData.Pop();
+	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
 	return -1;
 }
 
@@ -52,9 +57,14 @@ void UVM::writeRegister(uint32 reg, int32 value) {
 }
 
 void UVM::writePort(uint8 port, int32 value) {
-	TArray<int>* validPort = ports.Find(port);
+	FPort* validPort = ports.Find(port);
 	if (validPort) {
-		validPort->Push(value);
+		if (((uint8)validPort->rwFlags & (uint8)EReadWriteEnable::write) == 0) {
+			raiseInterrupt(FString::Printf(TEXT("Attempting to write to a read only port, port number: %d!"), port));
+		}
+		else {
+			validPort->myData.Push(value);
+		}
 	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
 }
 
@@ -248,10 +258,18 @@ bool UVM::compileProgram(FString program, TArray<FcompiledInstruction>& instruct
 
 TArray<int32> UVM::getPort(uint8 port)
 {
-	TArray<int32>* validPort = ports.Find(port);
-	if (validPort) return *validPort;
+	FPort* validPort = ports.Find(port);
+	if (validPort) return validPort->myData;
 	else UE_LOG(LogVM, Error, TEXT("Could not find port %d"), port);
 	return TArray<int32>();
+}
+
+FPort UVM::getPortFull(uint8 port)
+{
+	FPort* validPort = ports.Find(port);
+	if (validPort) return *validPort;
+	else UE_LOG(LogVM, Error, TEXT("Could not find port %d"), port);
+	return FPort();
 }
 
 int32 UVM::getRegister(int32 reg)
@@ -261,18 +279,44 @@ int32 UVM::getRegister(int32 reg)
 
 bool UVM::runProgram(FString program)
 {
-	TArray<FcompiledInstruction> instructions;
-	if (!compileProgram(program, instructions)) return false;
-	while (instructions.IsValidIndex(pc)) {
-		if (interrupt) {
-			return false;
+	if (!compileProgram(program, curProgram)) return false;
+	runningProgram = true;
+	ranWithoutErrors = true;
+	pc = 0;
+	unPauseProgram();
+	return true;
+}
+
+void UVM::unPauseProgram() {
+	if (!interrupt) {
+		stepProgram();
+		if (curProgram.IsValidIndex(pc)) {
+			GetWorld()->GetTimerManager().SetTimer(stepTimer, this, &UVM::unPauseProgram, runSpeed);
 		}
 		else {
-			if (!executeInstruction(instructions[pc])) return false;
+			runningProgram = false;
+			FProgramResults results;
+			results.ports = ports;
+			results.ranWithoutErrors = ranWithoutErrors;
+			programEnded.Broadcast(results);
 		}
-		pc++;
+	}
+}
+
+bool UVM::stepProgram() {
+	if (!curProgram.IsValidIndex(pc)) {
+		runningProgram = false;
+	}
+	if (!executeInstruction(curProgram[pc++])) {
+		ranWithoutErrors = false;
+		return false;
 	}
 	return true;
+}
+
+void UVM::pauseProgram() {
+	interrupt = true;
+	stepTimer.Invalidate();
 }
 
 void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> preLoadedPorts)
@@ -282,15 +326,17 @@ void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> pr
 	registers = TArray<int32>();
 	registers.SetNumZeroed(maxReg + 1);
 	ports.Reset();
-	for (uint8 i = 0; i < _maxPort + 1; i++) ports.Add(i, TArray<int32>());
+	for (uint8 i = 0; i < _maxPort + 1; i++) ports.Add(i, FPort());
 	for (const FportDataLoader& data : preLoadedPorts) ports[data.portNumber] = data.data;
 	interrupt = false;
 	pc = 0;
+	ranWithoutErrors = true;
+	runningProgram = false;
 }
 
 void UVM::testRunProgram() {
 	TArray<FportDataLoader> preLoadedPorts;
-	preLoadedPorts.Add(FportDataLoader(0, {2,2}));
+	preLoadedPorts.Add(FportDataLoader(0, FPort({2,2}, (uint8)EReadWriteEnable::readWrite)));
 	resetMachine(0, 1, preLoadedPorts);
 	runProgram("ADD P0 P0 P1");
 }
