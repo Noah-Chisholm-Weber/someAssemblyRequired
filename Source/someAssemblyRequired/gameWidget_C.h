@@ -6,12 +6,35 @@
 #include "Blueprint/UserWidget.h"
 #include "gameWidget_C.generated.h"
 
+class UVM;
+class UVMTester;
+
 /**
- * 
+ * Main game UI widget.
  */
 UCLASS()
 class SOMEASSEMBLYREQUIRED_API UgameWidget_C : public UUserWidget
 {
 	GENERATED_BODY()
-	
+
+protected:
+
+	virtual void NativeConstruct() override;
+
+	UPROPERTY()
+	UVM* VM;
+
+	UPROPERTY()
+	UVMTester* testSuite;
+
+public:
+
+	UFUNCTION(BlueprintCallable, Category = "VM")
+	UVM* GetVM() const;
+
+	UFUNCTION(BlueprintCallable, Category = "VM")
+	FText PortValuesToText(const TArray<int32>& Values) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Test Suite")
+	void runTest(FString program);
 };
