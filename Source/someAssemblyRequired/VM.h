@@ -147,7 +147,7 @@ struct FPort
 	}
 
 	FPort() {
-		rwFlags = 0;
+		rwFlags = 3;
 	}
 };
 
@@ -210,6 +210,7 @@ struct FProgramResults
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FProgramEnded, FProgramResults, results);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMachineStateChanged);
 
 UCLASS(BlueprintType)
 class SOMEASSEMBLYREQUIRED_API UVM : public UObject
@@ -250,6 +251,8 @@ private:
 
 	void raiseInterrupt(const FString& debugMessage);
 
+	void programRunner();
+
 public:
 	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
 	bool compileProgram(FString program, TArray<FcompiledInstruction>& instructions);
@@ -281,6 +284,28 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Program Execution")
 	void pauseProgram();
 
+	UFUNCTION(BlueprintCallable, Category = "Program Execution")
+	void stopProgram();
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Program Execution")
+	const bool isPaused();
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Program Execution")
+	const bool isStopped();
+
 	UPROPERTY(BlueprintAssignable, Category = "Program Execution")
 	FProgramEnded programEnded;
+
+	UPROPERTY(BlueprintAssignable, Category = "Program Execution")
+	FMachineStateChanged stateChanged;
+
+	virtual UWorld* GetWorld() const override
+	{
+		if (UObject* Outer = GetOuter())
+		{
+			return Outer->GetWorld();
+		}
+
+		return nullptr;
+	}
 };

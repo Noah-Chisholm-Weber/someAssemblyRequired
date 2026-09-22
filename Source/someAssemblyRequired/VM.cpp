@@ -2,6 +2,7 @@
 
 
 #include "VM.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY(LogVM)
 
@@ -26,7 +27,10 @@ int UVM::readPort(uint8 port) {
 			raiseInterrupt(FString::Printf(TEXT("Attempting to read from a write only port, port number: %d!"), port));
 			return -1;
 		}
-		return validPort->myData.Pop();
+		stateChanged.Broadcast();
+		if (validPort->myData.Num() > 0) return validPort->myData.Pop();
+		raiseInterrupt(FString::Printf(TEXT("Attempting to read from an empty port, port number: %d!"), port));
+		return -1;
 	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
 	return -1;
 }
@@ -53,6 +57,7 @@ int UVM::readOperand(FopperandValue op)
 void UVM::writeRegister(uint32 reg, int32 value) {
 	if (registers.IsValidIndex(reg)) {
 		registers[reg] = value;
+		stateChanged.Broadcast();
 	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid register! This machine only has registers 0-%d"), reg, maxReg));
 }
 
@@ -64,6 +69,7 @@ void UVM::writePort(uint8 port, int32 value) {
 		}
 		else {
 			validPort->myData.Push(value);
+			stateChanged.Broadcast();
 		}
 	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
 }
@@ -288,35 +294,59 @@ bool UVM::runProgram(FString program)
 }
 
 void UVM::unPauseProgram() {
+	interrupt = false;
+	programRunner();
+}
+
+void UVM::programRunner() {
 	if (!interrupt) {
 		stepProgram();
 		if (curProgram.IsValidIndex(pc)) {
-			GetWorld()->GetTimerManager().SetTimer(stepTimer, this, &UVM::unPauseProgram, runSpeed);
+			GetWorld()->GetTimerManager().SetTimer(stepTimer, this, &UVM::programRunner, runSpeed);
 		}
 		else {
-			runningProgram = false;
-			FProgramResults results;
-			results.ports = ports;
-			results.ranWithoutErrors = ranWithoutErrors;
-			programEnded.Broadcast(results);
+			stopProgram();
 		}
 	}
 }
 
 bool UVM::stepProgram() {
+	if (!runningProgram) return false;
 	if (!curProgram.IsValidIndex(pc)) {
-		runningProgram = false;
+		stopProgram();
+		return false;
 	}
 	if (!executeInstruction(curProgram[pc++])) {
 		ranWithoutErrors = false;
 		return false;
 	}
+	stateChanged.Broadcast();
 	return true;
 }
 
 void UVM::pauseProgram() {
 	interrupt = true;
 	stepTimer.Invalidate();
+}
+
+void UVM::stopProgram() {
+	if (isStopped()) return;
+	interrupt = true;
+	runningProgram = false;
+	stepTimer.Invalidate();
+	pc = 0;
+	FProgramResults results;
+	results.ports = ports;
+	results.ranWithoutErrors = ranWithoutErrors;
+	programEnded.Broadcast(results);
+}
+
+const bool UVM::isPaused() {
+	return !stepTimer.IsValid() && !isStopped();
+}
+
+const bool UVM::isStopped() {
+	return !runningProgram;
 }
 
 void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> preLoadedPorts)
