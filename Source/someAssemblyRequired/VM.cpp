@@ -295,7 +295,7 @@ bool UVM::runProgram(FString program)
 
 void UVM::unPauseProgram() {
 	interrupt = false;
-	programRunner();
+	GetWorld()->GetTimerManager().SetTimer(stepTimer, this, &UVM::programRunner, runSpeed);
 }
 
 void UVM::programRunner() {
@@ -320,6 +320,7 @@ bool UVM::stepProgram() {
 		ranWithoutErrors = false;
 		return false;
 	}
+	stepCount++;
 	stateChanged.Broadcast();
 	return true;
 }
@@ -335,6 +336,7 @@ void UVM::stopProgram() {
 	runningProgram = false;
 	stepTimer.Invalidate();
 	pc = 0;
+	stepCount = 0;
 	FProgramResults results;
 	results.ports = ports;
 	results.ranWithoutErrors = ranWithoutErrors;
@@ -349,6 +351,16 @@ const bool UVM::isStopped() {
 	return !runningProgram;
 }
 
+const int UVM::getStepCount()
+{
+	return stepCount;
+}
+
+const int UVM::getPC()
+{
+	return pc;
+}
+
 void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> preLoadedPorts)
 {
 	maxReg = _maxReg;
@@ -360,8 +372,10 @@ void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> pr
 	for (const FportDataLoader& data : preLoadedPorts) ports[data.portNumber] = data.data;
 	interrupt = false;
 	pc = 0;
+	stepCount = 0;
 	ranWithoutErrors = true;
 	runningProgram = false;
+	stateChanged.Broadcast();
 }
 
 void UVM::testRunProgram() {

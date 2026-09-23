@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "VM.h"
+#include "Engine/DataTable.h" // Required for FTableRowBase
 #include "VMTester.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogVMTester, Log, All);
@@ -12,26 +13,26 @@ DECLARE_LOG_CATEGORY_EXTERN(LogVMTester, Log, All);
 // One test case: how to reset/preload the machine, and what the output port
 // should look like after the (shared, static) program has run to completion.
 USTRUCT(BlueprintType)
-struct FVMTestCase
+struct FVMTestCase : public FTableRowBase
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString testName;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 maxReg;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 maxPort;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FportDataLoader> presetPorts;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	uint8 outputPort;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<int32> expectedOutput;
 
 	FVMTestCase()
@@ -118,6 +119,7 @@ public:
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Program Evaluation/Tests")
 	void testRunTester();
 
+	UFUNCTION(BlueprintCallable, Category = "Program Evaluation/Tests")
+	bool compareOutput(const TArray<int32>& actual, const TArray<int32>& expected, FString& outMessage);
 private:
-	static bool compareOutput(const TArray<int32>& actual, const TArray<int32>& expected, FString& outMessage);
 };

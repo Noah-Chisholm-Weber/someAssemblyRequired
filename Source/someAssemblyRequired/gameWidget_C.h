@@ -24,9 +24,6 @@ protected:
 	UPROPERTY()
 	UVM* VM;
 
-	UPROPERTY()
-	UVMTester* testSuite;
-
 public:
 
 	UFUNCTION(BlueprintCallable, Category = "VM")
@@ -34,6 +31,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "VM")
 	FText PortValuesToText(const TArray<int32>& Values) const;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Test Suite")
+	UVMTester* testSuite;
 
 	UFUNCTION(BlueprintCallable, Category = "Test Suite")
 	void runTest(FString program);

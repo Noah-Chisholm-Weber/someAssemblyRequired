@@ -117,7 +117,7 @@ struct FcompiledInstruction
 	FopperandValue op3;
 };
 
-UENUM(BlueprintType)
+UENUM(BlueprintType, Meta = (Bitflags, UseEnumValuesAsMaskValuesInEditor = "true"))
 enum class EReadWriteEnable : uint8
 {
 	None = 0x0,
@@ -125,16 +125,17 @@ enum class EReadWriteEnable : uint8
 	write = 0x2,
 	readWrite = 0x3
 };
+ENUM_CLASS_FLAGS(EReadWriteEnable);
 
 USTRUCT(BlueprintType)
 struct FPort
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<int32> myData;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Bitmask, BitmaskEnum = "/Script/someAssemblyRequired.EReadWriteEnable"))
 	uint8 rwFlags;
 
 	bool operator==(const FPort& Other) const
@@ -147,7 +148,7 @@ struct FPort
 	}
 
 	FPort() {
-		rwFlags = 3;
+		rwFlags = (int32)EReadWriteEnable::readWrite;
 	}
 };
 
@@ -164,10 +165,10 @@ struct FportDataLoader
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	uint8 portNumber;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FPort data;
 
 	FportDataLoader() {
@@ -235,6 +236,7 @@ private:
 	FTimerHandle stepTimer;
 	bool runningProgram = false;
 	bool ranWithoutErrors = true;
+	uint32 stepCount = 0;
 
 	int readRegister(uint32 reg);
 	int readPort(uint8 port);
@@ -292,6 +294,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Program Execution")
 	const bool isStopped();
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Program Evaluation")
+	const int getStepCount();
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Program Evaluation")
+	const int getPC();
 
 	UPROPERTY(BlueprintAssignable, Category = "Program Execution")
 	FProgramEnded programEnded;
