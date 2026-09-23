@@ -208,6 +208,9 @@ struct FProgramResults
 
 	UPROPERTY(BlueprintReadWrite)
 	bool ranWithoutErrors;
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 stepsTaken;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FProgramEnded, FProgramResults, results);
