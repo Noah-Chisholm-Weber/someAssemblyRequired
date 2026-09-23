@@ -2,6 +2,7 @@
 
 
 #include "VM.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY(LogVM)
 
@@ -20,9 +21,17 @@ int UVM::readRegister(uint32 reg) {
 }
 
 int UVM::readPort(uint8 port) {
-	TArray<int>* validPort = ports.Find(port);
-	if (validPort) return validPort->Pop();
-	else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
+	FPort* validPort = ports.Find(port);
+	if (validPort) {
+		if (((uint8)validPort->rwFlags & (uint8)EReadWriteEnable::read) == 0) {
+			raiseInterrupt(FString::Printf(TEXT("Attempting to read from a write only port, port number: %d!"), port));
+			return -1;
+		}
+		stateChanged.Broadcast();
+		if (validPort->myData.Num() > 0) return validPort->myData.Pop();
+		raiseInterrupt(FString::Printf(TEXT("Attempting to read from an empty port, port number: %d!"), port));
+		return -1;
+	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
 	return -1;
 }
 
@@ -48,13 +57,20 @@ int UVM::readOperand(FopperandValue op)
 void UVM::writeRegister(uint32 reg, int32 value) {
 	if (registers.IsValidIndex(reg)) {
 		registers[reg] = value;
+		stateChanged.Broadcast();
 	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid register! This machine only has registers 0-%d"), reg, maxReg));
 }
 
 void UVM::writePort(uint8 port, int32 value) {
-	TArray<int>* validPort = ports.Find(port);
+	FPort* validPort = ports.Find(port);
 	if (validPort) {
-		validPort->Push(value);
+		if (((uint8)validPort->rwFlags & (uint8)EReadWriteEnable::write) == 0) {
+			raiseInterrupt(FString::Printf(TEXT("Attempting to write to a read only port, port number: %d!"), port));
+		}
+		else {
+			validPort->myData.Push(value);
+			stateChanged.Broadcast();
+		}
 	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
 }
 
@@ -248,10 +264,18 @@ bool UVM::compileProgram(FString program, TArray<FcompiledInstruction>& instruct
 
 TArray<int32> UVM::getPort(uint8 port)
 {
-	TArray<int32>* validPort = ports.Find(port);
-	if (validPort) return *validPort;
+	FPort* validPort = ports.Find(port);
+	if (validPort) return validPort->myData;
 	else UE_LOG(LogVM, Error, TEXT("Could not find port %d"), port);
 	return TArray<int32>();
+}
+
+FPort UVM::getPortFull(uint8 port)
+{
+	FPort* validPort = ports.Find(port);
+	if (validPort) return *validPort;
+	else UE_LOG(LogVM, Error, TEXT("Could not find port %d"), port);
+	return FPort();
 }
 
 int32 UVM::getRegister(int32 reg)
@@ -261,18 +285,80 @@ int32 UVM::getRegister(int32 reg)
 
 bool UVM::runProgram(FString program)
 {
-	TArray<FcompiledInstruction> instructions;
-	if (!compileProgram(program, instructions)) return false;
-	while (instructions.IsValidIndex(pc)) {
-		if (interrupt) {
-			return false;
+	if (!compileProgram(program, curProgram)) return false;
+	runningProgram = true;
+	ranWithoutErrors = true;
+	pc = 0;
+	unPauseProgram();
+	return true;
+}
+
+void UVM::unPauseProgram() {
+	interrupt = false;
+	GetWorld()->GetTimerManager().SetTimer(stepTimer, this, &UVM::programRunner, runSpeed);
+}
+
+void UVM::programRunner() {
+	if (!interrupt) {
+		stepProgram();
+		if (curProgram.IsValidIndex(pc)) {
+			GetWorld()->GetTimerManager().SetTimer(stepTimer, this, &UVM::programRunner, runSpeed);
 		}
 		else {
-			if (!executeInstruction(instructions[pc])) return false;
+			stopProgram();
 		}
-		pc++;
 	}
+}
+
+bool UVM::stepProgram() {
+	if (!runningProgram) return false;
+	if (!curProgram.IsValidIndex(pc)) {
+		stopProgram();
+		return false;
+	}
+	if (!executeInstruction(curProgram[pc++])) {
+		ranWithoutErrors = false;
+		return false;
+	}
+	stepCount++;
+	stateChanged.Broadcast();
 	return true;
+}
+
+void UVM::pauseProgram() {
+	interrupt = true;
+	stepTimer.Invalidate();
+}
+
+void UVM::stopProgram() {
+	if (isStopped()) return;
+	interrupt = true;
+	runningProgram = false;
+	stepTimer.Invalidate();
+	pc = 0;
+	stepCount = 0;
+	FProgramResults results;
+	results.ports = ports;
+	results.ranWithoutErrors = ranWithoutErrors;
+	programEnded.Broadcast(results);
+}
+
+const bool UVM::isPaused() {
+	return !stepTimer.IsValid() && !isStopped();
+}
+
+const bool UVM::isStopped() {
+	return !runningProgram;
+}
+
+const int UVM::getStepCount()
+{
+	return stepCount;
+}
+
+const int UVM::getPC()
+{
+	return pc;
 }
 
 void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> preLoadedPorts)
@@ -282,15 +368,19 @@ void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> pr
 	registers = TArray<int32>();
 	registers.SetNumZeroed(maxReg + 1);
 	ports.Reset();
-	for (uint8 i = 0; i < _maxPort + 1; i++) ports.Add(i, TArray<int32>());
+	for (uint8 i = 0; i < _maxPort + 1; i++) ports.Add(i, FPort());
 	for (const FportDataLoader& data : preLoadedPorts) ports[data.portNumber] = data.data;
 	interrupt = false;
 	pc = 0;
+	stepCount = 0;
+	ranWithoutErrors = true;
+	runningProgram = false;
+	stateChanged.Broadcast();
 }
 
 void UVM::testRunProgram() {
 	TArray<FportDataLoader> preLoadedPorts;
-	preLoadedPorts.Add(FportDataLoader(0, {2,2}));
+	preLoadedPorts.Add(FportDataLoader(0, FPort({2,2}, (uint8)EReadWriteEnable::readWrite)));
 	resetMachine(0, 1, preLoadedPorts);
 	runProgram("ADD P0 P0 P1");
 }
