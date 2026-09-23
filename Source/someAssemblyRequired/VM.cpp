@@ -93,6 +93,15 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 	FString curParam;
 	TCHAR* end;
 	char firstChar;
+	if (params.Num() != validDef->params.Num()) {
+		if (params.Num() < validDef->params.Num()) {
+			UE_LOG(LogVM, Error, TEXT("There were too few params for the %s command when verifing a %s! Expected: %s"), *base, *line, *validDef->toString());
+		}
+		else {
+			UE_LOG(LogVM, Error, TEXT("There were too many params for the %s command when verifing a %s! Expected: %s"), *base, *line, *validDef->toString());
+		}
+		return false;
+	}
 	for (const EparameterType& type : validDef->params) {
 		curParam = params[counter];
 		switch (type)
@@ -121,7 +130,7 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 				UE_LOG(LogVM, Warning, TEXT("Could not parse an int for the register id after address type identifier for address only parameter! Line: %s"), *line);
 				return false;
 			}
-
+			break;
 		case EparameterType::value:
 			switch (counter) {
 			case 0:
@@ -141,6 +150,7 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 				UE_LOG(LogVM, Warning, TEXT("Could not parse an int for value only parameter! Line: %s"), *line);
 				return false;
 			}
+			break;
 		case EparameterType::label:
 			UE_LOG(LogVM, Error, TEXT("Label not implemlented yet!"));
 			return false;
@@ -165,8 +175,7 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 					UE_LOG(LogVM, Warning, TEXT("Could not parse an int for address or value parameter when missing address type identifier! Line: %s"), *line);
 					return false;
 				}
-			}
-			switch (counter) {
+			} else switch (counter) {
 			case 0:
 				compiledInstruction.op1 = FopperandValue(firstChar == 'R' ? EopperandType::reg : EopperandType::port, FCString::Strtoi(*curParam + 1, &end, 10));
 				break;
@@ -184,6 +193,7 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 				UE_LOG(LogVM, Warning, TEXT("Could not parse an int for the register id after address type identifier for address or value parameter! Line: %s"), *line);
 				return false;
 			}
+			break;
 		default:
 			UE_LOG(LogVM, Error, TEXT("Unhandled EparameterType in verifyLine!"));
 			break;
@@ -242,6 +252,11 @@ TArray<int32> UVM::getPort(uint8 port)
 	if (validPort) return *validPort;
 	else UE_LOG(LogVM, Error, TEXT("Could not find port %d"), port);
 	return TArray<int32>();
+}
+
+int32 UVM::getRegister(int32 reg)
+{
+	return readRegister(reg);
 }
 
 bool UVM::runProgram(FString program)

@@ -7,6 +7,7 @@
 #include "gameWidget_C.generated.h"
 
 class UVM;
+class UVMTester;
 
 /**
  * Main game UI widget.
@@ -23,6 +24,9 @@ protected:
 	UPROPERTY()
 	UVM* VM;
 
+	UPROPERTY()
+	UVMTester* testSuite;
+
 public:
 
 	UFUNCTION(BlueprintCallable, Category = "VM")
@@ -30,4 +34,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "VM")
 	FText PortValuesToText(const TArray<int32>& Values) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Test Suite")
+	void runTest(FString program);
 };
