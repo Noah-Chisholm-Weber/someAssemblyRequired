@@ -336,10 +336,11 @@ void UVM::stopProgram() {
 	runningProgram = false;
 	stepTimer.Invalidate();
 	pc = 0;
-	stepCount = 0;
 	FProgramResults results;
 	results.ports = ports;
 	results.ranWithoutErrors = ranWithoutErrors;
+	results.stepsTaken = stepCount;
+	stepCount = 0;
 	programEnded.Broadcast(results);
 }
 
