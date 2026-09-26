@@ -4,14 +4,34 @@
 #include "VM.h"
 #include "Kismet/GameplayStatics.h"
 
+#define LOCTEXT_NAMESPACE "VMInstructions"
+
 DEFINE_LOG_CATEGORY(LogVM)
 
 FRegexPattern UVM::lineCheckerPattern = FRegexPattern(R"(^([A-Z]+)(( +[RP]?\d+)+$))");
 TMap<FString, FinstructionDefinition> UVM::instructionSet = TMap<FString, FinstructionDefinition>();
 
 UVM::UVM() {
-	registerInstruction(FinstructionDefinition(TEXT("MOV"), {EparameterType::addrOrValue, EparameterType::addrOrValue}, EopCode::mov));
-	registerInstruction(FinstructionDefinition(TEXT("ADD"), { EparameterType::addrOrValue, EparameterType::addrOrValue, EparameterType::addrOrValue }, EopCode::add));
+	registerInstruction(
+		FinstructionDefinition(TEXT("MOV"),
+		{
+			Fparameter(EparameterType::addr, LOCTEXT("Inst_MOV_Param1", "The address location to read from.")),
+			Fparameter(EparameterType::addr, LOCTEXT("Inst_MOV_Param2", "The address location to write to."))
+		}, EopCode::mov,
+		LOCTEXT("Inst_MOV_Desc", "Reads a value from the first address and writes that into the second."),
+		true
+	));
+
+	registerInstruction(
+		FinstructionDefinition(TEXT("ADD"),
+		{
+			Fparameter(EparameterType::addrOrValue, LOCTEXT("Inst_ADD_Param1", "The first value to sum. Can either be a hardcoded value or the an address to read a value from.")),
+			Fparameter(EparameterType::addrOrValue, LOCTEXT("Inst_ADD_Param2", "The second value to sum. Can either be a hardcoded value or the an address to read a value from.")),
+			Fparameter(EparameterType::addrOrValue, LOCTEXT("Inst_ADD_Param3", "The address into which to write the result of summing the values of param one and two."))
+		}, EopCode::add,
+		LOCTEXT("Inst_ADD_Desc", "Adds the values in the first two parameters together. These values can be integer literals or an address to read the value from. It writes the sum into the register specified in the third parameter."),
+		true
+	));
 }
 
 int UVM::readRegister(uint32 reg) {
@@ -362,6 +382,35 @@ const int UVM::getPC()
 	return pc;
 }
 
+void UVM::getAllCommandNames(TArray<FString>& commandNames, bool filterLocked)
+{
+	if (!filterLocked) instructionSet.GetKeys(commandNames);
+	else {
+		for (const auto& pair : instructionSet) {
+			const FString& key = pair.Key;
+			const FinstructionDefinition& value = pair.Value;
+			if (value.isUnlocked) commandNames.Add(key);
+		}
+	}
+}
+
+void UVM::getAllCommands(TArray<FinstructionDefinition>& commandDatas, bool filterLocked)
+{
+	if (!filterLocked) instructionSet.GenerateValueArray(commandDatas);
+	else {
+		for (const auto& pair : instructionSet) {
+			const FString& key = pair.Key;
+			const FinstructionDefinition& value = pair.Value;
+			if (value.isUnlocked) commandDatas.Add(value);
+		}
+	}
+}
+
+FinstructionDefinition UVM::getCommand(FString name)
+{
+	return instructionSet[name];
+}
+
 void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> preLoadedPorts)
 {
 	maxReg = _maxReg;
@@ -385,3 +434,5 @@ void UVM::testRunProgram() {
 	resetMachine(0, 1, preLoadedPorts);
 	runProgram("ADD P0 P0 P1");
 }
+
+#undef LOCTEXT_NAMESPACE

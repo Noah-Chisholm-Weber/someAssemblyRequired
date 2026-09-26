@@ -9,45 +9,88 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(LogVM, Log, All);
 
-UENUM()
-enum class EparameterType
+UENUM(BlueprintType)
+enum class EparameterType : uint8
 {
+	none,
 	addr,
 	value,
 	label,
 	addrOrValue
 };
 
-UENUM()
-enum class EopCode
+USTRUCT(BlueprintType)
+struct Fparameter
 {
-	add,
-	mov,
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	EparameterType type;
+	
+	UPROPERTY(BlueprintReadOnly)
+	FText paramDesc;
+
+	Fparameter() {
+		type = EparameterType::none;
+		paramDesc = FText();
+	}
+
+	Fparameter(EparameterType _type, FText _paramDesc) : type(_type), paramDesc(_paramDesc) {
+
+	}
 };
 
-USTRUCT()
+UENUM(BlueprintType)
+enum class EopCode : uint8
+{
+	undefined,
+	add,
+	mov,
+	gt,
+	gte,
+	lt,
+	lte,
+	neg,
+	sub
+};
+
+USTRUCT(BlueprintType)
 struct FinstructionDefinition
 {
 	GENERATED_BODY()
 
+	UPROPERTY(BlueprintReadOnly)
 	FString base;
-	TArray<EparameterType> params;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<Fparameter> params;
+
+	UPROPERTY(BlueprintReadOnly)
 	EopCode opCode;
+
+	UPROPERTY(BlueprintReadOnly)
+	FText instructionDesc;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool isUnlocked;
 
 	FinstructionDefinition() {
 		base = TEXT("");
-		params = TArray<EparameterType>();
-		opCode = (EopCode) - 1;
+		params = TArray<Fparameter>();
+		opCode = EopCode::undefined;
+		instructionDesc = FText();
+		isUnlocked = false;
 	}
 
-	FinstructionDefinition(FString _base, TArray<EparameterType> _params, EopCode _opCode) : base(_base), params(_params), opCode(_opCode) {
+	FinstructionDefinition(FString _base, TArray<Fparameter> _params, EopCode _opCode, FText _instructionDesc, bool _isUnlocked)
+		: base(_base), params(_params), opCode(_opCode), instructionDesc(_instructionDesc), isUnlocked(_isUnlocked) {
 
 	}
 
 	FString toString() const {
 		FString toReturn = base + " ";
-		for (const EparameterType& param : params) {
-			switch (param)
+		for (const Fparameter& param : params) {
+			switch (param.type)
 			{
 			case EparameterType::addr:
 				toReturn += "{P|R}<id>";
@@ -309,6 +352,15 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Program Execution")
 	FMachineStateChanged stateChanged;
+
+	UFUNCTION(BlueprintCallable, Category = "User Help")
+	void getAllCommandNames(TArray<FString>& commandNames, bool filterLocked);
+
+	UFUNCTION(BlueprintCallable, Category = "User Help")
+	void getAllCommands(TArray<FinstructionDefinition>& commandDatas, bool filterLocked);
+
+	UFUNCTION(BlueprintCallable, Category = "User Help")
+	FinstructionDefinition getCommand(FString name);
 
 	virtual UWorld* GetWorld() const override
 	{
