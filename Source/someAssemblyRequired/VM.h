@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "Internationalization/Regex.h"
+#include "Engine/DataTable.h" // Required for FTableRowBase
 #include "VM.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogVM, Log, All);
@@ -24,10 +25,10 @@ struct Fparameter
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EparameterType type;
 	
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText paramDesc;
 
 	Fparameter() {
@@ -55,23 +56,23 @@ enum class EopCode : uint8
 };
 
 USTRUCT(BlueprintType)
-struct FinstructionDefinition
+struct FinstructionDefinition : public FTableRowBase
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString base;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<Fparameter> params;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EopCode opCode;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText instructionDesc;
 
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool isUnlocked;
 
 	FinstructionDefinition() {
@@ -295,13 +296,15 @@ private:
 	bool verifyLine(FString line, FcompiledInstruction& instruction);
 	bool executeInstruction(FcompiledInstruction& instruction);
 
-	static void registerInstruction(FinstructionDefinition newInstruction);
 
 	void raiseInterrupt(const FString& debugMessage);
 
 	void programRunner();
 
 public:
+	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
+	static void registerInstruction(FinstructionDefinition newInstruction);
+	
 	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
 	bool compileProgram(FString program, TArray<FcompiledInstruction>& instructions);
 

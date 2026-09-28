@@ -12,26 +12,7 @@ FRegexPattern UVM::lineCheckerPattern = FRegexPattern(R"(^([A-Z]+)(( +[RP]?\d+)+
 TMap<FString, FinstructionDefinition> UVM::instructionSet = TMap<FString, FinstructionDefinition>();
 
 UVM::UVM() {
-	registerInstruction(
-		FinstructionDefinition(TEXT("MOV"),
-		{
-			Fparameter(EparameterType::addr, LOCTEXT("Inst_MOV_Param1", "The address location to read from.")),
-			Fparameter(EparameterType::addr, LOCTEXT("Inst_MOV_Param2", "The address location to write to."))
-		}, EopCode::mov,
-		LOCTEXT("Inst_MOV_Desc", "Reads a value from the first address and writes that into the second."),
-		true
-	));
 
-	registerInstruction(
-		FinstructionDefinition(TEXT("ADD"),
-		{
-			Fparameter(EparameterType::addrOrValue, LOCTEXT("Inst_ADD_Param1", "The first value to sum. Can either be a hardcoded value or the an address to read a value from.")),
-			Fparameter(EparameterType::addrOrValue, LOCTEXT("Inst_ADD_Param2", "The second value to sum. Can either be a hardcoded value or the an address to read a value from.")),
-			Fparameter(EparameterType::addrOrValue, LOCTEXT("Inst_ADD_Param3", "The address into which to write the result of summing the values of param one and two."))
-		}, EopCode::add,
-		LOCTEXT("Inst_ADD_Desc", "Adds the values in the first two parameters together. These values can be integer literals or an address to read the value from. It writes the sum into the register specified in the third parameter."),
-		true
-	));
 }
 
 int UVM::readRegister(uint32 reg) {
@@ -138,8 +119,10 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction) {
 		}
 		return false;
 	}
-	for (const EparameterType& type : validDef->params) {
+
+	for (const Fparameter& expectedParam : validDef->params) {
 		curParam = params[counter];
+		EparameterType type = expectedParam.type;
 		switch (type)
 		{
 		case EparameterType::addr:
