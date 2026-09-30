@@ -5,49 +5,94 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "Internationalization/Regex.h"
+#include "Engine/DataTable.h" // Required for FTableRowBase
 #include "VM.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(LogVM, Log, All);
 
-UENUM()
-enum class EparameterType
+UENUM(BlueprintType)
+enum class EparameterType : uint8
 {
+	none,
 	addr,
 	value,
 	label,
 	addrOrValue
 };
 
-UENUM()
-enum class EopCode
-{
-	add,
-	mov,
-};
-
-USTRUCT()
-struct FinstructionDefinition
+USTRUCT(BlueprintType)
+struct Fparameter
 {
 	GENERATED_BODY()
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EparameterType type;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText paramDesc;
+
+	Fparameter() {
+		type = EparameterType::none;
+		paramDesc = FText();
+	}
+
+	Fparameter(EparameterType _type, FText _paramDesc) : type(_type), paramDesc(_paramDesc) {
+
+	}
+};
+
+UENUM(BlueprintType)
+enum class EopCode : uint8
+{
+	undefined,
+	empty,
+	add,
+	mov,
+	gt,
+	gte,
+	lt,
+	lte,
+	neg,
+	sub
+};
+
+USTRUCT(BlueprintType)
+struct FinstructionDefinition : public FTableRowBase
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FString base;
-	TArray<EparameterType> params;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<Fparameter> params;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EopCode opCode;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText instructionDesc;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool isUnlocked;
 
 	FinstructionDefinition() {
 		base = TEXT("");
-		params = TArray<EparameterType>();
-		opCode = (EopCode) - 1;
+		params = TArray<Fparameter>();
+		opCode = EopCode::undefined;
+		instructionDesc = FText();
+		isUnlocked = false;
 	}
 
-	FinstructionDefinition(FString _base, TArray<EparameterType> _params, EopCode _opCode) : base(_base), params(_params), opCode(_opCode) {
+	FinstructionDefinition(FString _base, TArray<Fparameter> _params, EopCode _opCode, FText _instructionDesc, bool _isUnlocked)
+		: base(_base), params(_params), opCode(_opCode), instructionDesc(_instructionDesc), isUnlocked(_isUnlocked) {
 
 	}
 
 	FString toString() const {
 		FString toReturn = base + " ";
-		for (const EparameterType& param : params) {
-			switch (param)
+		for (const Fparameter& param : params) {
+			switch (param.type)
 			{
 			case EparameterType::addr:
 				toReturn += "{P|R}<id>";
@@ -97,6 +142,10 @@ struct FopperandValue
 	FopperandValue(EopperandType _type, int32 _value) : type(_type), value(_value) {
 
 	}
+
+	FopperandValue(char _type, int32 _value) : FopperandValue(_type == 'R' ? EopperandType::reg : EopperandType::port, _value) {
+
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -115,6 +164,27 @@ struct FcompiledInstruction
 
 	UPROPERTY(BlueprintReadWrite)
 	FopperandValue op3;
+
+	UPROPERTY(BlueprintReadWrite)
+	uint8 paramCount = 0;
+
+	bool addParam(FopperandValue newParam) {
+		switch (paramCount++) {
+		case 0:
+			op1 = newParam;
+			break;
+		case 1:
+			op2 = newParam;
+			break;
+		case 2:
+			op3 = newParam;
+			break;
+		default:
+			//UE_LOG(LogVM, Error, TEXT("Too many operands for opCode %s!"), (uint8)opCode);
+			return false;
+		}
+		return true;
+	}
 };
 
 UENUM(BlueprintType, Meta = (Bitflags, UseEnumValuesAsMaskValuesInEditor = "true"))
@@ -213,7 +283,28 @@ struct FProgramResults
 	int32 stepsTaken;
 };
 
+USTRUCT(BlueprintType)
+struct FCompileError {
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+	FText errorMessage;
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 line;
+
+	FCompileError() {
+		errorMessage = FText();
+		line = -1;
+	}
+
+	FCompileError(FText _errorMessage, int32 _line) : errorMessage(_errorMessage), line(_line) {
+
+	}
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FProgramEnded, FProgramResults, results);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCompilationErrorOccurred, FCompileError, error);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMachineStateChanged);
 
 UCLASS(BlueprintType)
@@ -249,16 +340,18 @@ private:
 	void writePort(uint8 port, int32 value);
 	void writeValue(FopperandValue location, int32 value);
 
-	bool verifyLine(FString line, FcompiledInstruction& instruction);
+	bool verifyLine(FString line, FcompiledInstruction& instruction, int32 lineNumber);
 	bool executeInstruction(FcompiledInstruction& instruction);
 
-	static void registerInstruction(FinstructionDefinition newInstruction);
 
 	void raiseInterrupt(const FString& debugMessage);
 
 	void programRunner();
 
 public:
+	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
+	static void registerInstruction(FinstructionDefinition newInstruction);
+	
 	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
 	bool compileProgram(FString program, TArray<FcompiledInstruction>& instructions);
 
@@ -309,6 +402,18 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Program Execution")
 	FMachineStateChanged stateChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "User Help")
+	FCompilationErrorOccurred errorEvent;
+
+	UFUNCTION(BlueprintCallable, Category = "User Help")
+	void getAllCommandNames(TArray<FString>& commandNames, bool filterLocked);
+
+	UFUNCTION(BlueprintCallable, Category = "User Help")
+	void getAllCommands(TArray<FinstructionDefinition>& commandDatas, bool filterLocked);
+
+	UFUNCTION(BlueprintCallable, Category = "User Help")
+	FinstructionDefinition getCommand(FString name);
 
 	virtual UWorld* GetWorld() const override
 	{
