@@ -45,6 +45,7 @@ UENUM(BlueprintType)
 enum class EopCode : uint8
 {
 	undefined,
+	empty,
 	add,
 	mov,
 	gt,
@@ -141,6 +142,10 @@ struct FopperandValue
 	FopperandValue(EopperandType _type, int32 _value) : type(_type), value(_value) {
 
 	}
+
+	FopperandValue(char _type, int32 _value) : FopperandValue(_type == 'R' ? EopperandType::reg : EopperandType::port, _value) {
+
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -159,6 +164,27 @@ struct FcompiledInstruction
 
 	UPROPERTY(BlueprintReadWrite)
 	FopperandValue op3;
+
+	UPROPERTY(BlueprintReadWrite)
+	uint8 paramCount = 0;
+
+	bool addParam(FopperandValue newParam) {
+		switch (paramCount++) {
+		case 0:
+			op1 = newParam;
+			break;
+		case 1:
+			op2 = newParam;
+			break;
+		case 2:
+			op3 = newParam;
+			break;
+		default:
+			//UE_LOG(LogVM, Error, TEXT("Too many operands for opCode %s!"), (uint8)opCode);
+			return false;
+		}
+		return true;
+	}
 };
 
 UENUM(BlueprintType, Meta = (Bitflags, UseEnumValuesAsMaskValuesInEditor = "true"))
@@ -257,7 +283,28 @@ struct FProgramResults
 	int32 stepsTaken;
 };
 
+USTRUCT(BlueprintType)
+struct FCompileError {
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+	FText errorMessage;
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 line;
+
+	FCompileError() {
+		errorMessage = FText();
+		line = -1;
+	}
+
+	FCompileError(FText _errorMessage, int32 _line) : errorMessage(_errorMessage), line(_line) {
+
+	}
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FProgramEnded, FProgramResults, results);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCompilationErrorOccurred, FCompileError, error);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMachineStateChanged);
 
 UCLASS(BlueprintType)
@@ -293,7 +340,7 @@ private:
 	void writePort(uint8 port, int32 value);
 	void writeValue(FopperandValue location, int32 value);
 
-	bool verifyLine(FString line, FcompiledInstruction& instruction);
+	bool verifyLine(FString line, FcompiledInstruction& instruction, int32 lineNumber);
 	bool executeInstruction(FcompiledInstruction& instruction);
 
 
@@ -355,6 +402,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Program Execution")
 	FMachineStateChanged stateChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "User Help")
+	FCompilationErrorOccurred errorEvent;
 
 	UFUNCTION(BlueprintCallable, Category = "User Help")
 	void getAllCommandNames(TArray<FString>& commandNames, bool filterLocked);
