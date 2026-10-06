@@ -123,6 +123,15 @@ enum class EopperandType
 	value
 };
 
+UENUM()
+enum class EParseStateVM
+{
+	firstToken,
+	afterLabel,
+	instruction,
+	parameters
+};
+
 USTRUCT(BlueprintType)
 struct FopperandValue
 {
@@ -317,7 +326,7 @@ public:
 
 private:
 	static TMap<FString, FinstructionDefinition> instructionSet;
-	static FRegexPattern lineCheckerPattern;
+	//static FRegexPattern lineCheckerPattern;
 	
 	uint32 maxReg;
 	uint8 maxPort;
@@ -341,6 +350,8 @@ private:
 	void writeValue(FopperandValue location, int32 value);
 
 	bool verifyLine(FString line, FcompiledInstruction& instruction, int32 lineNumber);
+	bool verifyLine2(FString line, FcompiledInstruction& compiledInstruction, int32 lineNumber, TMap<FString, uint32>& labelMap, TMap<uint32, FString>& reverseLabelMap);
+
 	bool executeInstruction(FcompiledInstruction& instruction);
 
 
