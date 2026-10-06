@@ -53,7 +53,8 @@ enum class EopCode : uint8
 	lt,
 	lte,
 	neg,
-	sub
+	sub,
+	jmp
 };
 
 USTRUCT(BlueprintType)
