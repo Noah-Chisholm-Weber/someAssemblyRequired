@@ -834,12 +834,12 @@ bool UVM::compileProgram(FString program, TArray<FcompiledInstruction>& instruct
 
 	for (const auto& pair : reverseLabelMap) {
 		const uint32 lineNum = pair.Key;
-		const FString label = pair.Value;
+		const FString& label = pair.Value;
 		if (labelMap.Contains(label)) {
 			instructions[lineNum].addParam(FopperandValue(EopperandType::value, labelMap[label]));
 		}
 		else {
-			errorEvent.Broadcast(FCompileError(FText::FormatNamed(LOCTEXT("labelNotExist", "The label '{label}' does not exist!"), TEXT("label"), label), lineNum));
+			errorEvent.Broadcast(FCompileError(FText::FormatNamed(LOCTEXT("labelNotExist", "The label '{label}' does not exist!"), TEXT("label"), FText::FromString(label)), lineNum));
 			return false;
 		}
 	}
