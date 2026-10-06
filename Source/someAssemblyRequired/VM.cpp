@@ -861,16 +861,25 @@ bool UVM::executeInstruction(FcompiledInstruction& instruction)
 		break;
 	case EopCode::gt:
 		if (readOperand(instruction.op1) > readOperand(instruction.op2)) pc = readOperand(instruction.op3);
+		break;
 	case EopCode::lt:
 		if (readOperand(instruction.op1) < readOperand(instruction.op2)) pc = readOperand(instruction.op3);
+		break;
 	case EopCode::gte:
 		if (readOperand(instruction.op1) >= readOperand(instruction.op2)) pc = readOperand(instruction.op3);
+		break;
 	case EopCode::lte:
 		if (readOperand(instruction.op1) <= readOperand(instruction.op2)) pc = readOperand(instruction.op3);
+		break;
 	case EopCode::sub:
 		writeValue(instruction.op3, readOperand(instruction.op1) - readOperand(instruction.op2));
+		break;
 	case EopCode::neg:
 		writeValue(instruction.op1, -(readOperand(instruction.op1)));
+		break;
+	case EopCode::jmp:
+		pc = readOperand(instruction.op1);
+		break;
 	default:
 		UE_LOG(LogVM, Error, TEXT("Unhandled command!"));
 		return false;
