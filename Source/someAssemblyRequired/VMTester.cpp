@@ -44,7 +44,7 @@ bool UVMTester::runTestCase(UVM* vm, const FString& program, const FVMTestCase& 
 	// V0 spec: "The VM is reset to a fresh state between tests."
 	vm->resetMachine(testCase.maxReg, testCase.maxPort, testCase.presetPorts);
 
-	outResult.ranWithoutError = vm->runProgram(program);
+	outResult.ranWithoutError = vm->runProgramSync(program);
 	outResult.actualOutput = vm->getPort(testCase.outputPort);
 
 	if (!outResult.ranWithoutError) {
@@ -83,13 +83,13 @@ TArray<FVMTestCase> UVMTester::getDefaultAdditionTestSuite()
 	// V0 scope only needs to support the first addition-based challenge:
 	// two values are read from the input port (P0) and their sum is
 	// expected to show up as the single value on the output port (P1).
-	suite.Add(FVMTestCase(TEXT("Test 1: 2 + 2"), 0, 1, { FportDataLoader(0, {2, 2}) }, 1, {4}));
-	suite.Add(FVMTestCase(TEXT("Test 2: 5 + 7"), 0, 1, { FportDataLoader(0, {5, 7}) }, 1, {12}));
-	suite.Add(FVMTestCase(TEXT("Test 3: -3 + 10"), 0, 1, { FportDataLoader(0, {-3, 10}) }, 1, {7}));
-	suite.Add(FVMTestCase(TEXT("Test 4: 0 + 0"), 0, 1, { FportDataLoader(0, {0, 0}) }, 1, {0}));
-	suite.Add(FVMTestCase(TEXT("Test 5: 100 + (-100)"), 0, 1, { FportDataLoader(0, {100, -100}) }, 1, {0}));
+	suite.Add(FVMTestCase(TEXT("Test 1: 2 + 2"), 0, 1, { FportDataLoader(0, {2, 2}) }, 1, { 4 }));
+	suite.Add(FVMTestCase(TEXT("Test 2: 5 + 7"), 0, 1, { FportDataLoader(0, {5, 7}) }, 1, { 12 }));
+	suite.Add(FVMTestCase(TEXT("Test 3: -3 + 10"), 0, 1, { FportDataLoader(0, {-3, 10}) }, 1, { 7 }));
+	suite.Add(FVMTestCase(TEXT("Test 4: 0 + 0"), 0, 1, { FportDataLoader(0, {0, 0}) }, 1, { 0 }));
+	suite.Add(FVMTestCase(TEXT("Test 5: 100 + (-100)"), 0, 1, { FportDataLoader(0, {100, -100}) }, 1, { 0 }));
 	// Extra test case, per Bob's Uncle's suggestion in team chat (9/8, 11:02 AM).
-	suite.Add(FVMTestCase(TEXT("Test 6 (extra): 15 + (-20)"), 0, 1, { FportDataLoader(0, {15, -20}) }, 1, {-5}));
+	suite.Add(FVMTestCase(TEXT("Test 6 (extra): 15 + (-20)"), 0, 1, { FportDataLoader(0, {15, -20}) }, 1, { -5 }));
 
 	return suite;
 }

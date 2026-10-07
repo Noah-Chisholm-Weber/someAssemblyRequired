@@ -27,7 +27,7 @@ struct Fparameter
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EparameterType type;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FText paramDesc;
 
@@ -164,10 +164,10 @@ struct FcompiledInstruction
 
 	UPROPERTY(BlueprintReadWrite)
 	EopCode opCode;
-	
+
 	UPROPERTY(BlueprintReadWrite)
 	FopperandValue op1;
-	
+
 	UPROPERTY(BlueprintReadWrite)
 	FopperandValue op2;
 
@@ -327,7 +327,7 @@ public:
 private:
 	static TMap<FString, FinstructionDefinition> instructionSet;
 	//static FRegexPattern lineCheckerPattern;
-	
+
 	uint32 maxReg;
 	uint8 maxPort;
 	TArray<int32> registers;
@@ -362,7 +362,7 @@ private:
 public:
 	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
 	static void registerInstruction(FinstructionDefinition newInstruction);
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
 	bool compileProgram(FString program, TArray<FcompiledInstruction>& instructions);
 
@@ -377,6 +377,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Program Execution")
 	bool runProgram(FString program);
+
+	// Runs the whole program right away instead of on the timer. Used by the tester.
+	UFUNCTION(BlueprintCallable, Category = "Program Execution")
+	bool runProgramSync(FString program, int32 maxSteps = 1000);
+
+	UFUNCTION(BlueprintCallable, Category = "User Help")
+	static void setCommandUnlocked(const FString& name, bool unlocked);
 
 	UFUNCTION(BlueprintCallable, Category = "Program Execution")
 	void resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> preLoadedPorts);

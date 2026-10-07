@@ -16,7 +16,7 @@ UVM::UVM() {
 
 int UVM::readRegister(uint32 reg) {
 	if (registers.IsValidIndex(reg)) return registers[reg];
-	else raiseInterrupt(FString::Printf(TEXT("%d is not a valid register! This machine only has registers 0-%d"), reg, maxReg ));
+	else raiseInterrupt(FString::Printf(TEXT("%d is not a valid register! This machine only has registers 0-%d"), reg, maxReg));
 	return -1;
 }
 
@@ -31,7 +31,8 @@ int UVM::readPort(uint8 port) {
 		if (validPort->myData.Num() > 0) return validPort->myData.Pop();
 		raiseInterrupt(FString::Printf(TEXT("Attempting to read from an empty port, port number: %d!"), port));
 		return -1;
-	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
+	}
+	else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
 	return -1;
 }
 
@@ -58,7 +59,8 @@ void UVM::writeRegister(uint32 reg, int32 value) {
 	if (registers.IsValidIndex(reg)) {
 		registers[reg] = value;
 		stateChanged.Broadcast();
-	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid register! This machine only has registers 0-%d"), reg, maxReg));
+	}
+	else raiseInterrupt(FString::Printf(TEXT("%d is not a valid register! This machine only has registers 0-%d"), reg, maxReg));
 }
 
 void UVM::writePort(uint8 port, int32 value) {
@@ -71,7 +73,8 @@ void UVM::writePort(uint8 port, int32 value) {
 			validPort->myData.Push(value);
 			stateChanged.Broadcast();
 		}
-	} else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
+	}
+	else raiseInterrupt(FString::Printf(TEXT("%d is not a valid port! This machine only supports ports 0-%d"), port, maxPort));
 }
 
 void UVM::writeValue(FopperandValue location, int32 value) {
@@ -615,8 +618,9 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction, in
 			errorEvent.Broadcast(FCompileError(FText::FormatNamed(LOCTEXT("tooFewParams", "There were too few parameters for the {base} command! Expected: {expected}"), TEXT("base"), FText::FromString(base), TEXT("expected"), FText::FromString(validDef->toString())), lineNumber));
 
 			UE_LOG(LogVM, Error, TEXT("There were too few params for the %s command when verifying a %s! Expected: %s"), *base, *line, *validDef->toString());
-		} else {
-			errorEvent.Broadcast(FCompileError(FText::FormatNamed(LOCTEXT("tooManyParams", "There were too many parameters for the {base} command! Expected: {expected}" ), TEXT("base"), FText::FromString(base), TEXT("expected"), FText::FromString(validDef->toString())), lineNumber));
+		}
+		else {
+			errorEvent.Broadcast(FCompileError(FText::FormatNamed(LOCTEXT("tooManyParams", "There were too many parameters for the {base} command! Expected: {expected}"), TEXT("base"), FText::FromString(base), TEXT("expected"), FText::FromString(validDef->toString())), lineNumber));
 
 			UE_LOG(LogVM, Error, TEXT("There were too many params for the %s command when verifying a %s! Expected: %s"), *base, *line, *validDef->toString());
 		}
@@ -772,7 +776,8 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction, in
 				const int32 value = static_cast<int32>(parsedValue);
 
 				if (!compiledInstruction.addParam(FopperandValue(EopperandType::value, value))) return false;
-			} else {
+			}
+			else {
 				const TCHAR* numberStart = *curParam + 1;
 				const int64 parsedAddress = FCString::Strtoi64(numberStart, &end, 10);
 
@@ -924,6 +929,41 @@ bool UVM::runProgram(FString program)
 	return true;
 }
 
+bool UVM::runProgramSync(FString program, int32 maxSteps)
+{
+	if (!compileProgram(program, curProgram)) return false;
+	runningProgram = true;
+	ranWithoutErrors = true;
+	interrupt = false;
+	pc = 0;
+	stepCount = 0;
+	while (runningProgram) {
+		if ((int32)stepCount >= maxSteps) {
+			raiseInterrupt(TEXT("Step limit reached!"));
+			ranWithoutErrors = false;
+			break;
+		}
+		// Skip empty lines and labels here so stepProgram never goes past the end of the program.
+		while (curProgram.IsValidIndex(pc) && curProgram[pc].opCode == EopCode::empty) pc++;
+		if (!curProgram.IsValidIndex(pc)) break;
+		bool stepped = stepProgram();
+		if (interrupt) {
+			ranWithoutErrors = false;
+			break;
+		}
+		if (!stepped) break;
+	}
+	stopProgram();
+	return ranWithoutErrors;
+}
+
+void UVM::setCommandUnlocked(const FString& name, bool unlocked)
+{
+	FinstructionDefinition* validDef = instructionSet.Find(name.ToUpper());
+	if (validDef) validDef->isUnlocked = unlocked;
+	else UE_LOG(LogVM, Warning, TEXT("Could not find %s to change its unlock status."), *name);
+}
+
 void UVM::unPauseProgram() {
 	interrupt = false;
 	GetWorld()->GetTimerManager().SetTimer(stepTimer, this, &UVM::programRunner, runSpeed);
@@ -1042,7 +1082,7 @@ void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> pr
 
 void UVM::testRunProgram() {
 	TArray<FportDataLoader> preLoadedPorts;
-	preLoadedPorts.Add(FportDataLoader(0, FPort({2,2}, (uint8)EReadWriteEnable::readWrite)));
+	preLoadedPorts.Add(FportDataLoader(0, FPort({ 2,2 }, (uint8)EReadWriteEnable::readWrite)));
 	resetMachine(0, 1, preLoadedPorts);
 	runProgram("ADD P0 P0 P1");
 }
