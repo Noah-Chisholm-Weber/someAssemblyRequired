@@ -3,6 +3,7 @@
 
 #include "VM.h"
 #include "Kismet/GameplayStatics.h"
+#include "Algo/Reverse.h"
 #include "Algo/LevenshteinDistance.h"
 
 DEFINE_LOG_CATEGORY(LogVM)
@@ -956,7 +957,12 @@ bool UVM::stepProgram() {
 		stopProgram();
 		return false;
 	}
-	while (curProgram[pc].opCode == EopCode::empty) pc++;
+	while (curProgram[pc].opCode == EopCode::empty) {
+		if (!curProgram.IsValidIndex(++pc)) {
+			stopProgram();
+			return false;
+		}
+	}
 	if (!executeInstruction(curProgram[pc++])) {
 		ranWithoutErrors = false;
 		return false;
@@ -1040,7 +1046,10 @@ void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> pr
 	registers.SetNumZeroed(maxReg + 1);
 	ports.Reset();
 	for (uint8 i = 0; i < _maxPort + 1; i++) ports.Add(i, FPort());
-	for (const FportDataLoader& data : preLoadedPorts) ports[data.portNumber] = data.data;
+	for (const FportDataLoader& data : preLoadedPorts) {
+		ports[data.portNumber] = data.data;
+		Algo::Reverse(ports[data.portNumber].myData);
+	}
 	interrupt = false;
 	pc = 0;
 	stepCount = 0;
