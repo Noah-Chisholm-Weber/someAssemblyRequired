@@ -54,7 +54,9 @@ enum class EopCode : uint8
 	lte,
 	neg,
 	sub,
-	jmp
+	jmp,
+	eq,
+	mul
 };
 
 USTRUCT(BlueprintType)
@@ -336,7 +338,7 @@ private:
 	bool interrupt = false;
 	uint32 pc = 0;
 	TArray<FcompiledInstruction> curProgram;
-	float runSpeed = 0.75f;
+	float runSpeed = defaultRunSpeed;
 	FTimerHandle stepTimer;
 	bool runningProgram = false;
 	bool ranWithoutErrors = true;
@@ -361,6 +363,9 @@ private:
 	void programRunner();
 
 public:
+	UPROPERTY(BlueprintReadOnly, Category = "Program Execution")
+	float defaultRunSpeed = 0.75f;
+	
 	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
 	static void registerInstruction(FinstructionDefinition newInstruction);
 	
@@ -436,4 +441,10 @@ public:
 
 		return nullptr;
 	}
+
+	UFUNCTION(BlueprintCallable, Category = "VM Management")
+	bool setInstructionLock(FString toUpdate, bool newLock);
+
+	UFUNCTION(BlueprintCallable, Category = "VM Management")
+	void setRunSpeed(float secondsPerInstruction);
 };
