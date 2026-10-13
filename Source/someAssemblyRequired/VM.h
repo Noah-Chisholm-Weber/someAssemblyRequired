@@ -315,8 +315,33 @@ struct FCompileError {
 	}
 };
 
+USTRUCT(BlueprintType)
+struct FRuntimeError {
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+	FText errorMessage;
+
+	//UPROPERTY(BlueprintReadWrite)
+	//int32 line;
+
+	FRuntimeError() {
+		errorMessage = FText();
+		//line = -1;
+	}
+
+	//FCompileError(FText _errorMessage, int32 _line) : errorMessage(_errorMessage), line(_line) {
+
+	//}
+
+	FRuntimeError(FText _errorMessage) : errorMessage(_errorMessage) {
+
+	}
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FProgramEnded, FProgramResults, results);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCompilationErrorOccurred, FCompileError, error);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRuntimeErrorOccurred, FRuntimeError, runtimeError);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMachineStateChanged);
 
 UCLASS(BlueprintType)
@@ -338,6 +363,11 @@ private:
 	bool interrupt = false;
 	uint32 pc = 0;
 	TArray<FcompiledInstruction> curProgram;
+	uint32 loopDetectionLimit = 200;
+public:
+	UPROPERTY(BlueprintReadOnly, Category = "Program Execution")
+	float defaultRunSpeed = 0.75f;
+private:
 	float runSpeed = defaultRunSpeed;
 	FTimerHandle stepTimer;
 	bool runningProgram = false;
@@ -363,9 +393,6 @@ private:
 	void programRunner();
 
 public:
-	UPROPERTY(BlueprintReadOnly, Category = "Program Execution")
-	float defaultRunSpeed = 0.75f;
-	
 	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
 	static void registerInstruction(FinstructionDefinition newInstruction);
 	
@@ -422,6 +449,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "User Help")
 	FCompilationErrorOccurred errorEvent;
+
+	UPROPERTY(BlueprintAssignable, Category = "User Help")
+	FRuntimeErrorOccurred runtimeErrorEvent;
 
 	UFUNCTION(BlueprintCallable, Category = "User Help")
 	void getAllCommandNames(TArray<FString>& commandNames, bool filterLocked);

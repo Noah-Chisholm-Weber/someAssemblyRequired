@@ -901,7 +901,7 @@ bool UVM::executeInstruction(FcompiledInstruction& instruction)
 		UE_LOG(LogVM, Error, TEXT("Unhandled command!"));
 		return false;
 	}
-	return true;
+	return !interrupt;
 }
 
 void UVM::registerInstruction(FinstructionDefinition newInstruction) {
@@ -917,6 +917,7 @@ void UVM::registerInstruction(FinstructionDefinition newInstruction) {
 void UVM::raiseInterrupt(const FString& debugMessage) {
 	UE_LOG(LogVM, Warning, TEXT("%s"), *debugMessage);
 	interrupt = true;
+	runtimeErrorEvent.Broadcast(FRuntimeError(FText::FromString(debugMessage)));
 }
 
 TArray<int32> UVM::getPort(uint8 port)
@@ -968,6 +969,13 @@ void UVM::programRunner() {
 }
 
 bool UVM::stepProgram() {
+	if (!ranWithoutErrors) return false;
+	interrupt = false;
+	if (stepCount > loopDetectionLimit) {
+		runtimeErrorEvent.Broadcast(FRuntimeError(FText::FromString(FString::Printf(TEXT("Execution stopped after %d instructions. Your program may contain an infinite loop or may be taking too long to finish."), loopDetectionLimit))));
+		stopProgram();
+		return false;
+	}
 	if (!runningProgram) return false;
 	if (!curProgram.IsValidIndex(pc)) {
 		stopProgram();
@@ -980,6 +988,7 @@ bool UVM::stepProgram() {
 		}
 	}
 	if (!executeInstruction(curProgram[pc++])) {
+		stopProgram();
 		ranWithoutErrors = false;
 		return false;
 	}
