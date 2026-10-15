@@ -914,6 +914,10 @@ void UVM::registerInstruction(FinstructionDefinition newInstruction) {
 	}
 }
 
+void UVM::resetInstructionSet() {
+	instructionSet.Reset();
+}
+
 void UVM::raiseInterrupt(const FString& debugMessage) {
 	UE_LOG(LogVM, Warning, TEXT("%s"), *debugMessage);
 	interrupt = true;

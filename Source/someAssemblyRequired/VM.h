@@ -393,8 +393,11 @@ private:
 	void programRunner();
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
+	UFUNCTION(BlueprintCallable, Category = "VM Management")
 	static void registerInstruction(FinstructionDefinition newInstruction);
+
+	UFUNCTION(BlueprintCallable, Category = "VM Management")
+	static void resetInstructionSet();
 	
 	UFUNCTION(BlueprintCallable, Category = "Program Evaluation")
 	bool compileProgram(FString program, TArray<FcompiledInstruction>& instructions);
