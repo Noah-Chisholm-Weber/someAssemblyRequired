@@ -147,6 +147,8 @@ bool UVM::verifyLine2(FString line, FcompiledInstruction& compiledInstruction, i
 			for (const auto& pair : instructionSet) {
 				const FString& command = pair.Key;
 				const int32 distance = Algo::LevenshteinDistance(base, command);
+				
+				if (!pair.Value.isUnlocked) continue;
 
 				if (distance < bestDistance) {
 					bestDistance = distance;
@@ -167,6 +169,9 @@ bool UVM::verifyLine2(FString line, FcompiledInstruction& compiledInstruction, i
 
 		if (!validDef->isUnlocked) {
 			UE_LOG(LogVM, Warning, TEXT("%s base was marked as locked!"), *base);
+			errorEvent.Broadcast(FCompileError(FText::FormatNamed(
+				LOCTEXT("instructionDoesNotExist", "{instBase} does not exist!"),
+				TEXT("instBase"), FText::FromString(base)), lineNumber));
 			return false;
 		}
 
@@ -862,15 +867,19 @@ bool UVM::executeInstruction(FcompiledInstruction& instruction)
 		break;
 	case EopCode::gt:
 		if (readOperand(instruction.op1) > readOperand(instruction.op2)) pc = readOperand(instruction.op3);
+		stateChanged.Broadcast();
 		break;
 	case EopCode::lt:
 		if (readOperand(instruction.op1) < readOperand(instruction.op2)) pc = readOperand(instruction.op3);
+		stateChanged.Broadcast();
 		break;
 	case EopCode::gte:
 		if (readOperand(instruction.op1) >= readOperand(instruction.op2)) pc = readOperand(instruction.op3);
+		stateChanged.Broadcast();
 		break;
 	case EopCode::lte:
 		if (readOperand(instruction.op1) <= readOperand(instruction.op2)) pc = readOperand(instruction.op3);
+		stateChanged.Broadcast();
 		break;
 	case EopCode::sub:
 		writeValue(instruction.op3, readOperand(instruction.op1) - readOperand(instruction.op2));
@@ -880,12 +889,19 @@ bool UVM::executeInstruction(FcompiledInstruction& instruction)
 		break;
 	case EopCode::jmp:
 		pc = readOperand(instruction.op1);
+		stateChanged.Broadcast();
 		break;
+	case EopCode::eq:
+		if (readOperand(instruction.op1) == readOperand(instruction.op2)) pc = readOperand(instruction.op3);
+		stateChanged.Broadcast();
+		break;
+	case EopCode::mul:
+		writeValue(instruction.op3, readOperand(instruction.op1) * readOperand(instruction.op2));
 	default:
 		UE_LOG(LogVM, Error, TEXT("Unhandled command!"));
 		return false;
 	}
-	return true;
+	return !interrupt;
 }
 
 void UVM::registerInstruction(FinstructionDefinition newInstruction) {
@@ -898,9 +914,14 @@ void UVM::registerInstruction(FinstructionDefinition newInstruction) {
 	}
 }
 
+void UVM::resetInstructionSet() {
+	instructionSet.Reset();
+}
+
 void UVM::raiseInterrupt(const FString& debugMessage) {
 	UE_LOG(LogVM, Warning, TEXT("%s"), *debugMessage);
 	interrupt = true;
+	runtimeErrorEvent.Broadcast(FRuntimeError(FText::FromString(debugMessage)));
 }
 
 TArray<int32> UVM::getPort(uint8 port)
@@ -952,6 +973,13 @@ void UVM::programRunner() {
 }
 
 bool UVM::stepProgram() {
+	if (!ranWithoutErrors) return false;
+	interrupt = false;
+	if (stepCount > loopDetectionLimit) {
+		runtimeErrorEvent.Broadcast(FRuntimeError(FText::FromString(FString::Printf(TEXT("Execution stopped after %d instructions. Your program may contain an infinite loop or may be taking too long to finish."), loopDetectionLimit))));
+		stopProgram();
+		return false;
+	}
 	if (!runningProgram) return false;
 	if (!curProgram.IsValidIndex(pc)) {
 		stopProgram();
@@ -964,6 +992,7 @@ bool UVM::stepProgram() {
 		}
 	}
 	if (!executeInstruction(curProgram[pc++])) {
+		stopProgram();
 		ranWithoutErrors = false;
 		return false;
 	}
@@ -1038,6 +1067,32 @@ FinstructionDefinition UVM::getCommand(FString name)
 	return instructionSet[name];
 }
 
+bool UVM::setInstructionLock(FString toUpdate, bool newUnlock)
+{
+	FinstructionDefinition* inst = instructionSet.Find(toUpdate);
+	if (inst) {
+		if (inst->isUnlocked == newUnlock) {
+			UE_LOG(LogVM, Warning, TEXT("Setting lock state for instruction %s to %s creates no change!"), *(inst->base), newUnlock ? TEXT("locked") : TEXT("unlocked"));
+			return false;
+		}
+		inst->isUnlocked = newUnlock;
+		return true;
+	}
+	else {
+		UE_LOG(LogVM, Warning, TEXT("%s has not been registered yet, cannot update its locked state."), *(inst->base));
+		return false;
+	}
+}
+
+void UVM::setRunSpeed(float secondsPerInstruction) {
+	if (secondsPerInstruction <= 0) {
+		UE_LOG(LogVM, Error, TEXT("secondsPerInstruction must be greater than 0!"));
+	}
+	else {
+		runSpeed = secondsPerInstruction;
+	}
+}
+
 void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> preLoadedPorts)
 {
 	maxReg = _maxReg;
@@ -1064,5 +1119,3 @@ void UVM::testRunProgram() {
 	resetMachine(0, 1, preLoadedPorts);
 	runProgram("ADD P0 P0 P1");
 }
-
-#undef LOCTEXT_NAMESPACE
