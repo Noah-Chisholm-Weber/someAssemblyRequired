@@ -79,6 +79,9 @@ struct FinstructionDefinition : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool isUnlocked;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool isActive;
+
 	FinstructionDefinition() {
 		base = TEXT("");
 		params = TArray<Fparameter>();
@@ -114,6 +117,10 @@ struct FinstructionDefinition : public FTableRowBase
 			}
 		}
 		return toReturn;
+	}
+
+	bool getIsAvailable() {
+		return isUnlocked && isActive;
 	}
 };
 
@@ -476,7 +483,10 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "VM Management")
-	bool setInstructionLock(FString toUpdate, bool newLock);
+	bool unlockInstruction(FString toUpdate);
+
+	UFUNCTION(BlueprintCallable, Category = "VM Management")
+	bool setInstructionActive(FString toUpdate, bool newActive);
 
 	UFUNCTION(BlueprintCallable, Category = "VM Management")
 	void setRunSpeed(float secondsPerInstruction);

@@ -167,7 +167,7 @@ bool UVM::verifyLine2(FString line, FcompiledInstruction& compiledInstruction, i
 			return false;
 		}
 
-		if (!validDef->isUnlocked) {
+		if (!validDef->getIsAvailable()) {
 			UE_LOG(LogVM, Warning, TEXT("%s base was marked as locked!"), *base);
 			errorEvent.Broadcast(FCompileError(FText::FormatNamed(
 				LOCTEXT("instructionDoesNotExist", "{instBase} does not exist!"),
@@ -897,6 +897,7 @@ bool UVM::executeInstruction(FcompiledInstruction& instruction)
 		break;
 	case EopCode::mul:
 		writeValue(instruction.op3, readOperand(instruction.op1) * readOperand(instruction.op2));
+		break;
 	default:
 		UE_LOG(LogVM, Error, TEXT("Unhandled command!"));
 		return false;
@@ -976,6 +977,7 @@ bool UVM::stepProgram() {
 	if (!ranWithoutErrors) return false;
 	interrupt = false;
 	if (stepCount > loopDetectionLimit) {
+		ranWithoutErrors = false;
 		runtimeErrorEvent.Broadcast(FRuntimeError(FText::FromString(FString::Printf(TEXT("Execution stopped after %d instructions. Your program may contain an infinite loop or may be taking too long to finish."), loopDetectionLimit))));
 		stopProgram();
 		return false;
@@ -992,8 +994,8 @@ bool UVM::stepProgram() {
 		}
 	}
 	if (!executeInstruction(curProgram[pc++])) {
-		stopProgram();
 		ranWithoutErrors = false;
+		stopProgram();
 		return false;
 	}
 	stepCount++;
@@ -1067,19 +1069,36 @@ FinstructionDefinition UVM::getCommand(FString name)
 	return instructionSet[name];
 }
 
-bool UVM::setInstructionLock(FString toUpdate, bool newUnlock)
+bool UVM::unlockInstruction(FString toUpdate)
 {
 	FinstructionDefinition* inst = instructionSet.Find(toUpdate);
 	if (inst) {
-		if (inst->isUnlocked == newUnlock) {
-			UE_LOG(LogVM, Warning, TEXT("Setting lock state for instruction %s to %s creates no change!"), *(inst->base), newUnlock ? TEXT("locked") : TEXT("unlocked"));
+		if (inst->isUnlocked) {
+			UE_LOG(LogVM, Warning, TEXT("Warning instruction %s is already unlocked!"), *(inst->base));
 			return false;
 		}
-		inst->isUnlocked = newUnlock;
+		inst->isUnlocked = true;
 		return true;
 	}
 	else {
-		UE_LOG(LogVM, Warning, TEXT("%s has not been registered yet, cannot update its locked state."), *(inst->base));
+		UE_LOG(LogVM, Warning, TEXT("%s has not been registered yet, cannot unlock it."), *(inst->base));
+		return false;
+	}
+}
+
+bool UVM::setInstructionActive(FString toUpdate, bool newActive)
+{
+	FinstructionDefinition* inst = instructionSet.Find(toUpdate);
+	if (inst) {
+		if (inst->isActive == newActive) {
+			UE_LOG(LogVM, Warning, TEXT("Setting active state for instruction %s to %s creates no change!"), *(inst->base), newActive ? TEXT("locked") : TEXT("unlocked"));
+			return false;
+		}
+		inst->isActive = newActive;
+		return true;
+	}
+	else {
+		UE_LOG(LogVM, Warning, TEXT("%s has not been registered yet, cannot update its active state."), *(inst->base));
 		return false;
 	}
 }
