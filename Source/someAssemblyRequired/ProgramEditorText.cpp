@@ -32,57 +32,102 @@ public:
         bool bParentEnabled
     ) const override
     {
-        if (Editor.IsValid())
+        const float InverseScale = 1.0f / AllottedGeometry.Scale;
+
+        const FSlateBrush* Brush =
+            FCoreStyle::Get().GetBrush("WhiteBrush");
+
+        const FSlateFontInfo& NumberFont =
+            GetDefaultTextStyle().Font;
+
+        for (int32 i = 0; i < LineViews.Num(); ++i)
         {
-            const FSlateBrush* Brush =
-                FCoreStyle::Get().GetBrush("WhiteBrush");
+            const FTextLayout::FLineView& Line = LineViews[i];
 
-            for (const FTextLayout::FLineView& Line : LineViews)
+            const int32 LineNumber = Line.ModelIndex + 1;
+
+            // Calculate the full distance occupied by this line.
+            float RowHeight = Line.Size.Y;
+
+            if (LineViews.IsValidIndex(i + 1))
             {
-                // Convert Slate's 0-based index to 1-based.
-                const int32 LineNumber = Line.ModelIndex + 1;
+                RowHeight =
+                    LineViews[i + 1].Offset.Y - Line.Offset.Y;
+            }
+            else if (LineViews.IsValidIndex(i - 1))
+            {
+                // Use the previous line's spacing for the final line.
+                RowHeight =
+                    Line.Offset.Y - LineViews[i - 1].Offset.Y;
+            }
 
+            // Convert the layout's pre-scaled coordinates
+            // into local widget coordinates.
+            const float Y = Line.Offset.Y * InverseScale;
+            const float H = FMath::Max(
+                1.0f,
+                RowHeight * InverseScale
+            );
+
+            // --------------------------------------------------
+            // Line background
+            // --------------------------------------------------
+
+            if (Editor.IsValid())
+            {
                 const EProgramLineStatus Status =
                     Editor->GetLineStatus(LineNumber);
 
-                if (Status == EProgramLineStatus::None)
+                if (Status != EProgramLineStatus::None)
                 {
-                    continue;
+                    const FLinearColor Color =
+                        Status == EProgramLineStatus::Error
+                        ? FLinearColor(0.147027, 0.004391, 0.005605, 1.000000)
+                        : FLinearColor(0.002125, 0.030713, 0.038204, 1.000000);
+
+                    FSlateDrawElement::MakeBox(
+                        OutDrawElements,
+                        LayerId,
+                        AllottedGeometry.ToPaintGeometry(
+                            FVector2D(0.0f, Y),
+                            FVector2D(
+                                AllottedGeometry.GetLocalSize().X,
+                                H
+                            )
+                        ),
+                        Brush,
+                        ESlateDrawEffect::None,
+                        Color * InWidgetStyle.GetColorAndOpacityTint()
+                    );
                 }
-
-                const FLinearColor Color =
-                    Status == EProgramLineStatus::Error
-                    ? FLinearColor(0.65f, 0.12f, 0.12f, 0.7f)
-                    : FLinearColor(0.3f, 0.3f, 0.3f, 0.7f);
-
-                const FVector2D Position(
-                    0.0f,
-                    Line.Offset.Y - ScrollOffset.Y
-                );
-
-                const FVector2D Size(
-                    AllottedGeometry.GetLocalSize().X,
-                    Line.Size.Y
-                );
-
-                FSlateDrawElement::MakeBox(
-                    OutDrawElements,
-                    LayerId,
-                    AllottedGeometry.ToPaintGeometry(Position, Size),
-                    Brush,
-                    ESlateDrawEffect::None,
-                    Color * InWidgetStyle.GetColorAndOpacityTint()
-                );
             }
+
+            // --------------------------------------------------
+            // Line number
+            // --------------------------------------------------
+
+            FSlateDrawElement::MakeText(
+                OutDrawElements,
+                LayerId + 1,
+                AllottedGeometry.ToPaintGeometry(
+                    FVector2D(8.0f, Y),
+                    FVector2D(44.0f, H)
+                ),
+                FString::FromInt(LineNumber),
+                NumberFont,
+                ESlateDrawEffect::None,
+                FLinearColor(0.55f, 0.55f, 0.55f, 1.0f)
+            );
         }
 
-        // Draw the actual text, cursor and selection above backgrounds.
+        // Draw the editor text, cursor, and selection
+        // above our backgrounds and line numbers.
         return FSlateTextLayout::OnPaint(
             Args,
             AllottedGeometry,
             MyCullingRect,
             OutDrawElements,
-            LayerId + 1,
+            LayerId + 2,
             InWidgetStyle,
             bParentEnabled
         );
@@ -105,6 +150,7 @@ TSharedRef<SWidget> UProgramEditorText::RebuildWidget()
     MyMultiLineEditableText = SNew(SMultiLineEditableText)
         .TextStyle(&WidgetStyle)
         .AutoWrapText(false)
+        .Margin(Margin)
         .AllowContextMenu(AllowContextMenu)
         .IsReadOnly(GetIsReadOnly())
         .SelectAllTextWhenFocused(GetSelectAllTextWhenFocused())
