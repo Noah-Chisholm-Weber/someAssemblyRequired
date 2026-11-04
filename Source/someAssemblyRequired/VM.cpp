@@ -1019,6 +1019,7 @@ bool UVM::stepProgram() {
 		return false;
 	}
 	stepCount++;
+	steppedEvent.Broadcast();
 	stateChanged.Broadcast();
 	return true;
 }
