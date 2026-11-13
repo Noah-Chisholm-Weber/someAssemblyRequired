@@ -350,6 +350,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FProgramEnded, FProgramResults, resu
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCompilationErrorOccurred, FCompileError, error);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FRuntimeErrorOccurred, FRuntimeError, runtimeError);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMachineStateChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FStepped);
 
 UCLASS(BlueprintType)
 class SOMEASSEMBLYREQUIRED_API UVM : public UObject
@@ -462,6 +463,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "User Help")
 	FRuntimeErrorOccurred runtimeErrorEvent;
+
+	UPROPERTY(BlueprintAssignable, Category = "User Help")
+	FStepped steppedEvent;
 
 	UFUNCTION(BlueprintCallable, Category = "User Help")
 	void getAllCommandNames(TArray<FString>& commandNames, bool filterLocked);

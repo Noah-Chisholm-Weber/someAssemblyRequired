@@ -6,6 +6,10 @@
 #include "Algo/Reverse.h"
 #include "Algo/LevenshteinDistance.h"
 
+//LOG's Sprint5 Additions
+#include "Engine/World.h"
+#include "TimerManager.h"
+
 DEFINE_LOG_CATEGORY(LogVM)
 
 //FRegexPattern UVM::lineCheckerPattern = FRegexPattern(R"(^([A-Z]+)(( +([RP]\d+|-?\d+))+$))");
@@ -952,6 +956,8 @@ bool UVM::runProgram(FString program)
 	runningProgram = true;
 	ranWithoutErrors = true;
 	pc = 0;
+	//LOG's Sprint5 Additions
+	stepCount = 0;
 	unPauseProgram();
 	return true;
 }
@@ -961,15 +967,29 @@ void UVM::unPauseProgram() {
 	GetWorld()->GetTimerManager().SetTimer(stepTimer, this, &UVM::programRunner, runSpeed);
 }
 
-void UVM::programRunner() {
-	if (!interrupt) {
-		stepProgram();
-		if (curProgram.IsValidIndex(pc)) {
-			GetWorld()->GetTimerManager().SetTimer(stepTimer, this, &UVM::programRunner, runSpeed);
+//LOG's Sprint5 Additions
+void UVM::programRunner()
+{
+	if (interrupt || !runningProgram) return;
+
+	// stepProgram may stop execution and broadcast programEnded.
+	// That Blueprint event can immediately start the next test.
+	// Don't continue processing the old test if stepping returned false.
+	if (!stepProgram()) return;
+
+	if (interrupt || !runningProgram) return;
+
+	if (curProgram.IsValidIndex(pc))
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimer(
+				stepTimer, this, &UVM::programRunner, runSpeed);
 		}
-		else {
-			stopProgram();
-		}
+	}
+	else
+	{
+		stopProgram();
 	}
 }
 
@@ -999,26 +1019,41 @@ bool UVM::stepProgram() {
 		return false;
 	}
 	stepCount++;
+	steppedEvent.Broadcast();
 	stateChanged.Broadcast();
 	return true;
 }
-
+//LOG's Sprint5 Additions
 void UVM::pauseProgram() {
+	if (!runningProgram) return;
+
 	interrupt = true;
-	stepTimer.Invalidate();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(stepTimer);
+	}
 }
 
+//LOG's Sprint5 Additions
 void UVM::stopProgram() {
 	if (isStopped()) return;
+
 	interrupt = true;
 	runningProgram = false;
-	stepTimer.Invalidate();
-	pc = 0;
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(stepTimer);
+	}
+
 	FProgramResults results;
 	results.ports = ports;
 	results.ranWithoutErrors = ranWithoutErrors;
 	results.stepsTaken = stepCount;
-	stepCount = 0;
+
+	// Preserve pc, stepCount, registers, and ports for inspection.
+	// Reset Machine clears them when the player retries.
 	programEnded.Broadcast(results);
 }
 
@@ -1114,6 +1149,11 @@ void UVM::setRunSpeed(float secondsPerInstruction) {
 
 void UVM::resetMachine(int32 _maxReg, int32 _maxPort, TArray<FportDataLoader> preLoadedPorts)
 {
+	//LOG's Sprint5 Additions
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(stepTimer);
+	}
 	maxReg = _maxReg;
 	maxPort = _maxPort;
 	registers = TArray<int32>();
