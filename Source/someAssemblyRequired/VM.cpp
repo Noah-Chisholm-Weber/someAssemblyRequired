@@ -831,6 +831,10 @@ bool UVM::verifyLine(FString line, FcompiledInstruction& compiledInstruction, in
 
 bool UVM::compileProgram(FString program, TArray<FcompiledInstruction>& instructions)
 {
+	if (program.TrimStartAndEnd().IsEmpty()) {
+		errorEvent.Broadcast(FCompileError(LOCTEXT("emptyProgram", "Program cannot be empty!"), 0));
+		return false;
+	}
 	TArray<FString> lines;
 	instructions.Reset();
 	instructions.SetNum(program.ParseIntoArrayLines(lines));
