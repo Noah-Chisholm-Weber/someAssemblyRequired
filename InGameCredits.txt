@@ -1,0 +1,56 @@
+CREDITS
+
+Some Assembly Required
+Created by Noah Chisholm, Logan Hanks, and Byron Keck
+In CS 4760/Weber State University
+
+----------------------------------------
+ART
+----------------------------------------
+
+UI button art by -[name / tool]-
+
+----------------------------------------
+MUSIC AND SOUND
+----------------------------------------
+
+Background music
+"venusalternate.wav" by haxekhaex2
+https://freesound.org/s/663923/
+Licensed under CC BY 4.0
+https://creativecommons.org/licenses/by/4.0/
+Modified: edited for seamless looping
+
+Challenge complete sound
+"8-bit confusion.wav" by michael_kur95
+https://freesound.org/s/332991/
+Licensed under CC BY 3.0
+http://creativecommons.org/licenses/by/3.0/
+
+Runtime error sound
+"Invalid" by VincentM400
+https://freesound.org/s/249618/
+Licensed under CC BY 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+Additional sounds (CC0, via freesound.org)
+"UI_Click" by unfa
+"Collectable videogame sound compilation" by Little_wall
+"Sony_DAT_(TCD-D10_PRO)_door_open.wav" by gurkboll
+"retro_game_death_sound" by Anonio82
+
+----------------------------------------
+ENGINE
+----------------------------------------
+
+Some Assembly Required uses the Unreal® Engine. Unreal® is a trademark or registered
+trademark of Epic Games, Inc. in the United States of America and elsewhere.
+
+Unreal® Engine, Copyright 1998 – 2026, Epic Games, Inc. All rights reserved.
+
+----------------------------------------
+LICENSE
+----------------------------------------
+
+Some Assembly Required is licensed under the [MIT License] — Copyright (c) 2026 Noah Chisholm, Logan Hanks, and Byron Keck.
+Source code: https://github.com/Noah-Chisholm-Weber/someAssemblyRequired.git
